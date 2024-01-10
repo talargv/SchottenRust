@@ -2,7 +2,7 @@ use super::{Player, Hand, CardsOnBoard, PlayerTag, Stone};
 
 use rand::{prelude::thread_rng, Rng};
 
-struct RandomPlayer {}
+pub struct RandomPlayer;
 impl Player for RandomPlayer {
     fn choose_action(&self, hand: &Hand, board: &CardsOnBoard, player: PlayerTag) -> (usize, Stone) {
         let mut rng = thread_rng();

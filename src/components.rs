@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::common::{NUM_OF_PLAYERS, NUM_OF_COLORS, NUM_OF_NUMS, NUM_OF_STONES};
 
 #[cfg(test)]
@@ -72,6 +74,12 @@ mod tests {
         Stone::build(NUM_OF_STONES);
     }
 
+
+    #[test]
+    fn card_display() {
+        assert_eq!(Card::build(1,1).to_string(), "Pu1");
+        assert_eq!(Card::build(9,4).to_string(), "Ye9");
+    }
 }
 
 #[derive(PartialEq, PartialOrd, Clone, Hash, Eq, Debug)]
@@ -97,6 +105,14 @@ impl Card {
     pub fn color(&self) -> u8 { self.color }
 
     pub fn color_index(&self) -> usize { (self.color-1) as usize }
+}
+
+const COLOR_TRANSLATIONS: [&'static str; NUM_OF_COLORS as usize] = ["Pu", "Br", "Re", "Ye", "Gr", "Bl"];
+
+impl fmt::Display for Card {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}{}", COLOR_TRANSLATIONS[self.color_index()], self.num)
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -136,6 +152,14 @@ impl Stone {
         if s >= NUM_OF_STONES {panic!("Stone index must be in range [0, NUM_OF_STONES), got {}", s);}
 
         Stone {s}
+    }
+
+    pub fn try_build(s: u8) -> Result<Self, ()> {
+        if s >= NUM_OF_STONES {
+            Err(())
+        } else {
+            Ok(Stone {s})
+        }
     }
 
     pub fn get_stone(&self) -> u8 {

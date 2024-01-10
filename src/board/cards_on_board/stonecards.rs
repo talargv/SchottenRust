@@ -1,15 +1,11 @@
+use std::ops::Index;
+
 use crate::common::STONE_CARDS_LIMIT;
 use crate::components::Card;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use crate::common::{NUM_OF_COLORS, NUM_OF_NUMS};
-
-    use std::collections::HashSet;
-    use std::fs::File;
-    use std::io::{BufReader, BufRead};
 
     use itertools::Itertools;
 
@@ -26,9 +22,6 @@ mod tests {
 
     #[test]
     fn test_strength() {
-        let mut cards_sorted: Vec<Vec<Card>> = Vec::new();
-        
-
         let sum_low = vec![Card::build(1,1), Card::build(1,2), Card::build(2,1)]; // 0
         let sum_high = vec![Card::build(9,1), Card::build(9,2), Card::build(8,2)]; // 1
 
@@ -167,4 +160,10 @@ impl StoneCards {
     }
 
     pub fn len(&self) -> usize { self.cards.len() }
+}
+
+impl Index<usize> for StoneCards {
+    type Output = Card; 
+
+    fn index(&self, idx: usize) -> &Self::Output { &self.cards[idx] }
 }

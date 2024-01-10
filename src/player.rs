@@ -1,4 +1,5 @@
-mod random_player;
+pub mod random_player;
+pub mod analog_player;
 
 use crate::board::cards_on_board::CardsOnBoard;
 use crate::board::hand::Hand;

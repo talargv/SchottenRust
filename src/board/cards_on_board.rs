@@ -3,8 +3,10 @@ mod advantage;
 mod claims;
 mod jobs;
 
+use std::fmt;
+
 use advantage::Advantage;
-use crate::common::{NUM_OF_STONES, NUM_OF_PLAYERS, NUM_OF_COLORS, NUM_OF_NUMS, STONE_CARDS_LIMIT};
+use crate::common::{NUM_OF_STONES, NUM_OF_PLAYERS, NUM_OF_COLORS, NUM_OF_NUMS, STONE_CARDS_LIMIT, SPACE, STONE_STR};
 use crate::components::{Player, Stone, Card};
 use claims::Claims;
 use stonecards::StoneCards;
@@ -97,12 +99,12 @@ mod tests {
 
             claims.borrow_mut().claim(Player::build(0), Stone::build(stone));
             let res_p1 = available_stones_rec(Rc::clone(&claims), stone+1);
-            assert!(!res_none.contains(&Stone::build(stone)));
+            assert!(!res_p1.contains(&Stone::build(stone)));
             claims.borrow_mut().unclaim(Stone::build(stone));
 
             claims.borrow_mut().claim(Player::build(1), Stone::build(stone));
             let res_p2 = available_stones_rec(Rc::clone(&claims), stone+1);
-            assert!(!res_none.contains(&Stone::build(stone)));
+            assert!(!res_p2.contains(&Stone::build(stone)));
             claims.borrow_mut().unclaim(Stone::build(stone));
 
             match rand::thread_rng().gen_range(0..=2) {
@@ -1026,12 +1028,98 @@ mod test_terminal_state {
     }
 }
 
+#[cfg(test)]
+mod test_display {
+    use super::*;
+
+    use std::{cell::RefCell, rc::Rc};
+
+    fn string_stones_for_rec(claims: Rc<RefCell<Claims>>, compare_to: Rc<RefCell<String>>, index: usize, player: Option<Player>) {
+        if index == NUM_OF_STONES as usize {
+            let mut board = CardsOnBoard::new();
+
+            board.claims = claims.borrow().clone();
+
+            assert_eq!(board.string_stones_for(player), compare_to.borrow().clone(), "{:#?}", board.claims);
+        } else {
+
+            assert_eq!(SPACE.len(), 3);
+
+            let all_players = vec![None, Some(Player::build(0)), Some(Player::build(1))];
+
+            for p in all_players {
+                compare_to.borrow_mut().push_str(if player == p { STONE_STR } else { SPACE });
+                compare_to.borrow_mut().push_str(SPACE);
+
+                if let Some(p) = p {
+                    claims.borrow_mut().claim(p, Stone::build(index as u8));    
+                }
+
+                string_stones_for_rec(Rc::clone(&claims), Rc::clone(&compare_to), index+1, player);
+
+
+                for _ in 0..6 {
+                    compare_to.borrow_mut().pop();
+                }
+                claims.borrow_mut().unclaim(Stone::build(index as u8));
+            }
+        }
+    }
+
+    #[test]
+    fn test_string_stones_for() {
+        string_stones_for_rec(
+            Rc::new(RefCell::new(Claims::new())),
+            Rc::new(RefCell::new(String::new())),
+            0,
+            None,
+        );
+
+        string_stones_for_rec(
+            Rc::new(RefCell::new(Claims::new())),
+            Rc::new(RefCell::new(String::new())),
+            0,
+            Some(Player::build(0)),
+        );
+
+        string_stones_for_rec(
+            Rc::new(RefCell::new(Claims::new())),
+            Rc::new(RefCell::new(String::new())),
+            0,
+            Some(Player::build(1)),
+        );
+    }
+
+
+    #[test]
+    fn test_string_nth_card_for() {
+        let mut board = CardsOnBoard::new();
+
+        for num in (1..NUM_OF_NUMS+1).filter(|n| *n != 4) {
+            board.place_card(Player::build(0), Stone::build(num-1), Card::build(num, 1));
+        }
+
+        let expected_string = format!("Pu1{SPACE}Pu2{SPACE}Pu3{SPACE}{SPACE}{SPACE}Pu5{SPACE}Pu6{SPACE}Pu7{SPACE}Pu8{SPACE}Pu9{SPACE}");
+        assert_eq!(board.string_nth_card_for(Player::build(0), 0), expected_string);
+        assert_eq!(board.string_nth_card_for(Player::build(1), 0), SPACE.repeat(2*NUM_OF_STONES as usize));
+        assert_eq!(board.string_nth_card_for(Player::build(0), 1), SPACE.repeat(2*NUM_OF_STONES as usize));
+        assert_eq!(board.string_nth_card_for(Player::build(0), 2), SPACE.repeat(2*NUM_OF_STONES as usize));
+
+        for num in (1..NUM_OF_NUMS+1).filter(|n| *n != 4) {
+            board.place_card(Player::build(1), Stone::build(num-1), Card::build(num, 1));
+        }
+
+        assert_eq!(board.string_nth_card_for(Player::build(1), 0), expected_string);
+    }
+}
+
 pub struct CardsOnBoard {
     advantage: Advantage,
     cards: Vec<Vec<StoneCards>>, // Maybe use array\slices somehow.
     present_cards: PresentCards,
     claims: Claims,
 }
+
 impl CardsOnBoard {
     pub fn new() -> Self {
         let mut cards: Vec<Vec<StoneCards>> = Vec::with_capacity(NUM_OF_PLAYERS as usize);
@@ -1211,6 +1299,86 @@ impl CardsOnBoard {
             .filter(|item| item.1.is_none() && !self.cards[player.get_index()][item.0].is_full())
             .next()
             .is_some()
+    }
+}
+
+impl CardsOnBoard {
+    // Helper methods for display trait
+
+    fn string_stones_for(&self, player: Option<Player>) -> String {
+        let mut output = String::new();
+
+        for stone in self.claims.iter() {
+            if *stone == player {
+                output.push_str(STONE_STR);
+            } else {
+                output.push_str(SPACE);
+            }
+
+            output.push_str(SPACE);
+        }
+
+        output
+    }
+
+    fn string_nth_card_for(&self, player: Player, index: usize) -> String {
+        if index >= STONE_CARDS_LIMIT as usize { panic!("Index out of bounds"); }
+
+        self.cards[player.get_index()]
+            .iter()
+            .map(|cards| {
+                let mut s = String::new();
+
+                if cards.len() > index {
+                    let tmp = cards[index].to_string();
+
+                    s.push_str(&tmp);
+                } else {
+                    s.push_str(SPACE);
+                }
+
+                s.push_str(SPACE);
+
+                s
+            })
+            .collect::<String>()
+
+    }
+}
+
+impl fmt::Display for CardsOnBoard {
+    
+
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // assert!(Card::build(1,1).to_string().len() == SPACE.len())
+
+        let mut board_string = String::new();
+
+        // Player 2's claimed stones
+        board_string.push_str(&self.string_stones_for(Some(Player::build(1))));
+        board_string.push_str("\n");
+
+        // Player 2's cards
+        for i in (0..STONE_CARDS_LIMIT as usize).rev() {
+            board_string.push_str(&self.string_nth_card_for(Player::build(1), i));
+            board_string.push_str("\n");
+        }
+
+        // Unclaimed stones
+        board_string.push_str(&self.string_stones_for(None));
+        board_string.push_str("\n");
+
+        // Player 1's cards
+        for i in 0..STONE_CARDS_LIMIT as usize {
+            board_string.push_str(&self.string_nth_card_for(Player::build(0), i));
+            board_string.push_str("\n");
+        }
+
+        // Player 1's claimed stones
+        board_string.push_str(&self.string_stones_for(Some(Player::build(0))));
+        board_string.push_str("\n");
+
+        write!(f, "{}", board_string)
     }
 }
 
